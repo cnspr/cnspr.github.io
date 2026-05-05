@@ -33,6 +33,9 @@ const REGION_ACTIONS = [
   },
 ];
 
+// Army actions injected per-army (not per-region)
+const ARMY_DIRECTIVES = ['advance', 'hold', 'raid', 'encircle'];
+
 export class RegionOrdersPanel {
   constructor(el, addOrderFn) {
     this.el          = el;
@@ -148,8 +151,9 @@ export class RegionOrdersPanel {
   // ── Render ────────────────────────────────────────────────────────────────
 
   _render() {
-    const region = this._region;
-    const heroes = (this._world?.heroes ?? []).filter(h => h.region_id === region.id);
+    const region  = this._region;
+    const heroes  = (this._world?.heroes ?? []).filter(h => h.region_id === region.id);
+    const armies  = (this._world?.armies ?? []).filter(a => a.region_id === region.id);
 
     const stagedBadge = this._staged > 0
       ? `<span class="wi-staged-badge">${this._staged} staged</span>`
@@ -161,11 +165,18 @@ export class RegionOrdersPanel {
            <button class="wo-link-btn" data-action="dispatch">Dispatch one</button>
          </div>`;
 
+    const armiesHtml = armies.length
+      ? armies.map(a => this._armyRowHtml(a)).join('')
+      : `<div class="wo-empty">No armies stationed here.</div>`;
+
     this.el.innerHTML = `
       <div class="wi-header">
         <span class="wi-title">Orders — ${region.name ?? region.id}</span>
         ${stagedBadge}
       </div>
+
+      <div class="wi-section-title">Armies in Region</div>
+      <div id="wo-armies">${armiesHtml}</div>
 
       <div class="wi-section-title">Agents in Region</div>
       <div id="wo-roster">${rosterHtml}</div>
@@ -184,6 +195,37 @@ export class RegionOrdersPanel {
   // ── Wiring ────────────────────────────────────────────────────────────────
 
   _wire() {
+    // Army directive buttons
+    this.el.querySelectorAll('.wo-directive-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._addOrder('army_directive', { army_id: btn.dataset.armyId, directive: btn.dataset.directive });
+        this._staged++;
+        this._render();
+      });
+    });
+
+    // Army move form submission
+    this.el.querySelectorAll('.wo-move-submit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = this.el.querySelector(`#wo-mv-${btn.dataset.armyId}`);
+        const target = input?.value?.trim();
+        if (!target) return;
+        this._addOrder('move_army', { army_id: btn.dataset.armyId, target_region_id: target });
+        this._staged++;
+        this._expandedId = null;
+        this._render();
+      });
+    });
+
+    // Toggle army move form
+    this.el.querySelectorAll('.wo-move-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.armyId;
+        this._expandedId = this._expandedId === `move-${id}` ? null : `move-${id}`;
+        this._render();
+      });
+    });
+
     // Toggle mission form per hero
     this.el.querySelectorAll('.wo-assign-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -228,6 +270,40 @@ export class RegionOrdersPanel {
       this._staged++;
       this._render();
     });
+  }
+
+  // ── Army row HTML ─────────────────────────────────────────────────────────
+
+  _armyRowHtml(army) {
+    const isMoving = this._expandedId === `move-${army.id}`;
+    const moveForm = isMoving ? `
+      <div class="wo-mission-form">
+        <label class="wo-form-label">Target region ID
+          <input id="wo-mv-${army.id}" class="wo-move-input" type="text" placeholder="reg_france_north" />
+        </label>
+        <div class="wo-risk-note">Engine validates region existence; adjacency enforced by client.</div>
+        <button class="wo-move-submit primary" data-army-id="${army.id}">Queue Move</button>
+      </div>
+    ` : '';
+
+    const directiveBtns = ARMY_DIRECTIVES.map(d =>
+      `<button class="wo-directive-btn" data-army-id="${army.id}" data-directive="${d}">${d}</button>`
+    ).join('');
+
+    return `
+      <div class="wo-hero-row${isMoving ? ' expanded' : ''}">
+        <div class="wo-hero-main">
+          <span class="wo-hero-name">${army.name ?? army.id}</span>
+          <span class="wo-hero-role">${army.doctrine ?? ''}</span>
+          <span class="wo-hero-status">STR ${army.strength ?? '?'} · MOR ${army.morale ?? '?'}</span>
+          <button class="wo-move-btn${isMoving ? ' active' : ''}" data-army-id="${army.id}">
+            ${isMoving ? 'Cancel Move' : 'Move'}
+          </button>
+        </div>
+        <div class="wo-directive-row">${directiveBtns}</div>
+        ${moveForm}
+      </div>
+    `;
   }
 
   // ── Hero row HTML ─────────────────────────────────────────────────────────

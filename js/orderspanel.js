@@ -4,6 +4,7 @@
 
 const ORDER_TYPES = [
   'army_directive',
+  'move_army',
   'raise_army',
   'recruit_hero',
   'assign_hero',
@@ -15,6 +16,7 @@ const ORDER_TYPES = [
 
 const PARAM_HINTS = {
   army_directive:  '{"army_id": "army_1st", "directive": "hold"}',
+  move_army:       '{"army_id": "army_1st", "target_region_id": "reg_france_north"}',
   raise_army:      '{"name": "2nd Legion", "region_id": "reg_england_wales", "doctrine": "maneuver"}',
   recruit_hero:    '{"name": "Vera", "role": "agent", "region_id": "reg_england_wales"}',
   assign_hero:     '{"hero_id": "h001", "target_id": "reg_france_north"}',
